@@ -9,8 +9,11 @@ require 'mechanize'
 
 class Piggybank
   attr_accessor :agent
-  def initialize(agent=nil)
+  attr_accessor :url_base
+
+  def initialize(agent=nil, url_base="https://chronus.mrn.org")
     @agent = agent
+    @url_base = url_base
     if @agent.nil?
       @agent = Mechanize.new
       @agent.user_agent_alias = 'Mac Firefox'
@@ -22,7 +25,7 @@ class Piggybank
     # a more complex version that uses the normal login page but it is
     # quite horrible, with randomly-named form parameters written by
     # javascript.
-    form_action = "https://chronus.mrn.org/micis/remote/loginPopupValidation.php"
+    form_action = "#{@url_base}/micis/remote/loginPopupValidation.php"
     page = @agent.post form_action, {
       :username => username,
       :pwd => password,
@@ -31,29 +34,30 @@ class Piggybank
   end
 
   def logged_in?
-    act = StudyListAction.new(@agent)
+    act = StudyListAction.new(self)
     act.get
-    !(act.redirects_to_login?)
+    !(act.redirected_to_login?)
   end
 
   def list_studies
-    StudyListAction.new(@agent)
+    StudyListAction.new(self)
   end
 
   class Action
-    def initialize(agent)
-      @agent = agent
+    def initialize(piggybank)
+      @piggybank = piggybank
+      @agent = piggybank.agent
     end
 
-    def redirects_to_login?
-      @agent.page.body.match "https://chronus.mrn.org/cas/login.php"
+    def redirected_to_login?
+      @agent.page.body.match "#{@piggybank.url_base}/cas/login.php"
     end
 
   end
 
   class StudyListAction < Action
     def get
-      @agent.get "https://chronus.mrn.org/micis/study/index.php?action=list"
+      @agent.get "#{@piggybank.url_base}/micis/study/index.php?action=list"
     end
   end
 
