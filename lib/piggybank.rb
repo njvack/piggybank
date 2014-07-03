@@ -48,6 +48,16 @@ class Piggybank
     act.get
   end
 
+  def list_subjects(study_id)
+    act = SubjectListAction.new(self)
+    act.get(study_id)
+  end
+
+  def get_demographics(subject)
+    act = SubjectViewAction.new(self)
+    act.get(subject)
+  end
+
   module ActionUtils
     def strip_quotes(str)
       str.gsub(/\A'|'\Z/, '')
@@ -55,6 +65,7 @@ class Piggybank
   end
 
   class Action
+    include Piggybank::ActionUtils
     def initialize(piggybank)
       @piggybank = piggybank
       @agent = piggybank.agent
@@ -67,8 +78,6 @@ class Piggybank
   end
 
   class StudyListAction < Action
-    include Piggybank::ActionUtils
-
     def get
       p = @agent.get "#{@piggybank.url_base}/micis/study/index.php?action=list"
       # Yields something like "[[stuff]]"
@@ -91,6 +100,51 @@ class Piggybank
     end
   end
 
+  class SubjectListAction < Action
+    def get(study_id)
+      p = @agent.get "#{@piggybank.url_base}/micis/subject/index.php?action=getStudy&study_id=#{study_id}&DoGetStudySubjects=true"
+      subject_data_ary = p.body.scan /\[('M[^\]]+)\]/
+      subject_data_ary.map {|sda|
+        d = sda[0]
+        s = Piggybank::Subject.new
+        s.ursi = d[/M\d+/] # URSIs start with M
+        s.ursi_key = d.match(/ursi=(.*?==)/)[1]
+        s
+      }
+    end
+  end
+
+  class SubjectViewAction < Action
+
+    FIELD_MAP = {
+      "First Name" => :first_name,
+      "Middle Name" => :middle_name,
+      "Last Name" => :last_name,
+      "Suffix" => :suffix,
+      "Birth Date" => :birth_date,
+      "Gender" => :gender,
+      "Address Line 1" => :address_1,
+      "Address Line 2" => :address_2,
+      "City" => :city,
+      "State" => :state,
+      "Zip" => :zip,
+      "Country" => :country,
+      "Email Address" => :email,
+      "Notes" => :notes,
+      "Phone1:" => :phone_1 }
+    def get(subject)
+      p = @agent.get "#{@piggybank.url_base}/micis/subject/index.php?action=view&ursi=#{subject.ursi_key}"
+      data_hash = Hash[p.search("td.frmLabel").map {|result|
+        [result.text, result.next_element.text]
+      }]
+      out = subject.dup
+      FIELD_MAP.each do |coins_field, pb_field|
+        out.send "#{pb_field}=", data_hash[coins_field]
+      end
+      out
+    end
+  end
+
   class Error < RuntimeError
 
   end
@@ -100,3 +154,4 @@ end
 
 
 require 'piggybank/study'
+require 'piggybank/subject'
