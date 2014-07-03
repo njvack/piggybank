@@ -72,6 +72,15 @@ def list_subjects(agent, study_id)
   }
 end
 
+def ursi_key(ursi)
+  # They're strings like "s:9:\"M53729038\";", base64 encoded
+  "s:9:\"#{ursi}\";"
+end
+
+def ursi_key_encoded(ursi)
+  Base64.urlsafe_encode64(ursi_key(ursi))
+end
+
 def subject_metadata(agent, ursi_key)
   page = agent.get("https://chronus.mrn.org/micis/subject/index.php?action=view&ursi=#{ursi_key}")
   out = {}
@@ -85,7 +94,7 @@ agent = Mechanize.new
 username = ARGV[0]
 password = ARGV[1]
 study_id = ARGV[2]
-page = coins_login_simple(agent, username, password)
-subjects = list_subjects agent, study_id
-pp subject_metadata agent, subjects[0].ursi_key
+#page = coins_login_simple(agent, username, password)
+#subjects = list_subjects agent, study_id
+#pp subject_metadata agent, subjects[0].ursi_key
 
