@@ -3,6 +3,7 @@
 # call like test_login.rb <username> <password>
 
 require '../lib/piggybank'
+require 'pp'
 
 username = ARGV[0]
 password = ARGV[1]
@@ -15,8 +16,5 @@ end
 pb = Piggybank.new()
 pb.login username, password
 
-if pb.logged_in?
-  puts "login success!"
-else
-  puts "login failed :("
-end
+studies = pb.list_studies
+pp studies
