@@ -2,7 +2,7 @@
 # Very simply test login
 # call like test_login.rb <username> <password>
 
-require '../lib/piggybank'
+require 'piggybank'
 
 username = ARGV[0]
 password = ARGV[1]
