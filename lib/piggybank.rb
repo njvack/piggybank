@@ -10,6 +10,7 @@
 # of regular expressions.
 
 require 'mechanize'
+require 'uri'
 
 class Piggybank
   attr_accessor :agent
@@ -24,6 +25,14 @@ class Piggybank
     end
   end
 
+  def login_from_key(key)
+    form_action = "https://portal.mrn.org/cas/shlogin.php"
+    page = @agent.post form_action, {
+      :uk => URI.decode_www_form_component(key)
+    }
+    page
+  end
+
   def login(username, password)
     # This method raises a warning from coins but still seems to work. There's
     # a more complex version that uses the normal login page but it is
@@ -35,6 +44,7 @@ class Piggybank
       :pwd => password,
       :appName => "MICIS"
     }
+    page
   end
 
   def logged_in?
