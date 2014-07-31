@@ -5,16 +5,15 @@
 require 'piggybank'
 require 'pp'
 
-username = ARGV[0]
-password = ARGV[1]
+key = ARGV[0]
 
-if !password
-  puts "Usage: #{__FILE__} <username> <password>"
+if !key
+  puts "Usage: #{__FILE__} <key>"
   exit(1)
 end
 
 pb = Piggybank.new()
-pb.login username, password
+pb.login_from_key key
 
 studies = pb.list_studies
 pp studies

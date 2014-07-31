@@ -5,16 +5,15 @@
 require 'piggybank'
 require 'pp'
 
-username = ARGV[0]
-password = ARGV[1]
-study_id = ARGV[2]
-if !password
-  puts "Usage: #{__FILE__} <username> <password> <study_id>"
+key = ARGV[0]
+study_id = ARGV[1]
+if !key
+  puts "Usage: #{__FILE__} <key> <study_id>"
   exit(1)
 end
 
 pb = Piggybank.new()
-pb.login username, password
+pb.login_from_key key
 
 subjects = pb.list_subjects(study_id)
 subjects.each do |subj|
