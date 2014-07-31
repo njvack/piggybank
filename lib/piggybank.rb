@@ -26,7 +26,7 @@ class Piggybank
   end
 
   def login_from_key(key)
-    form_action = "https://portal.mrn.org/cas/shlogin.php"
+    form_action = "#{@url_base}/cas/shlogin.php"
     page = @agent.post form_action, {
       :uk => URI.decode_www_form_component(key)
     }
