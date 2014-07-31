@@ -91,9 +91,10 @@ class Piggybank
     def get
       p = @agent.get "#{@piggybank.url_base}/micis/study/index.php?action=list"
       # Yields something like "[[stuff]]"
-      puts p.body
-      study_list = p.body.match(/parent\.list=\[(.*?)\];/)[1]
-      study_arrays = study_list.scan /\[(.*?)\]/
+      study_matches = p.body.match(/parent\.list=\[(.*?)\];/)
+      study_matches or return nil
+      study_list = study_matches[1]
+      study_arrays = study_list.scan(/\[(.*?)\]/)
       study_arrays.map {|ary|
         study_bits = ary[0].split(",").map {|bit| strip_quotes(bit)}
         s = Piggybank::Study.new
@@ -113,7 +114,7 @@ class Piggybank
   class SubjectListAction < Action
     def get(study_id)
       p = @agent.get "#{@piggybank.url_base}/micis/subject/index.php?action=getStudy&study_id=#{study_id}&DoGetStudySubjects=true"
-      subject_data_ary = p.body.scan /\[('M[^\]]+)\]/
+      subject_data_ary = p.body.scan(/\[('M[^\]]+)\]/)
       subject_data_ary.map {|sda|
         d = sda[0]
         s = Piggybank::Subject.new
