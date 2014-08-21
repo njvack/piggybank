@@ -80,9 +80,21 @@ class Piggybank
     act.get(study_id)
   end
 
+  def get_demographics_by_ursi(ursi)
+    s = Subject.new
+    s.ursi = ursi
+    s = get_demographics(s)
+    s
+  end
+
   def get_demographics(subject)
     act = SubjectViewAction.new(self)
     act.get(subject)
+  end
+
+  def list_instruments(study_id)
+    act = InstrumentListAction.new(self)
+    act.get(study_id)
   end
 
   module ActionUtils
@@ -169,6 +181,16 @@ class Piggybank
         out.send "#{pb_field}=", data_hash[coins_field]
       end
       out
+    end
+  end
+
+  class InstrumentListAction < Action
+    def get(study_id)
+      p = @agent.get "#{@piggybank.url_base}/micis/remote/getStudyData.php", {
+        :type => "instruments",
+        :id => study_id
+      }
+      p
     end
   end
 
