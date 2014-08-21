@@ -13,15 +13,32 @@ require 'mechanize'
 require 'uri'
 
 class Piggybank
+  DEFAULT_URL = "https://chronus.mrn.org"
   attr_accessor :agent
   attr_accessor :url_base
 
-  def initialize(agent=nil, url_base="https://chronus.mrn.org")
+  def initialize(agent=nil, url_base=DEFAULT_URL)
     @agent = agent
     @url_base = url_base
     if @agent.nil?
       @agent = Mechanize.new
       @agent.user_agent_alias = 'Mac Firefox'
+    end
+  end
+
+  class << self
+    def logged_in_from_key(key, agent=nil, url_base=DEFAULT_URL)
+      pb = self.new(agent, url_base)
+      pb.login_from_key(key)
+      pb
+    end
+
+    def logged_in_from_file(key_file=nil, agent=nil, url_base=DEFAULT_URL)
+      key_file ||= File.join(ENV['HOME'], "niGet_sh.key")
+      key = File.read(key_file).strip()
+      pb = self.new(agent, url_base)
+      pb.login_from_key(key)
+      pb
     end
   end
 
