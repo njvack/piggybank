@@ -119,7 +119,6 @@ class Piggybank
         d = sda[0]
         s = Piggybank::Subject.new
         s.ursi = d[/M\d+/] # URSIs start with M
-        s.ursi_key = d.match(/ursi=(.*?==)/)[1]
         s
       }
     end
