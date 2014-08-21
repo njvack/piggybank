@@ -11,6 +11,7 @@
 
 require 'mechanize'
 require 'uri'
+require 'json'
 
 class Piggybank
   DEFAULT_URL = "https://chronus.mrn.org"
@@ -190,7 +191,7 @@ class Piggybank
         :type => "instruments",
         :id => study_id
       }
-      p
+      JSON.parse(p.body)
     end
   end
 
