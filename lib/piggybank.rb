@@ -98,6 +98,15 @@ class Piggybank
     act.get(study_id)
   end
 
+  def get_assessments(study_id, instrument_id)
+    act = AssessmentDownloadAction.new(self)
+    pieces = AssessmentDownloadAction::DEFAULT_OUTPUT_PIECES.merge({
+      "instrumentId" => instrument_id.to_s,
+      "studyId" => study_id.to_s
+      })
+    act.get({"outputPieces" => [pieces]})
+  end
+
   module ActionUtils
     def strip_quotes(str)
       str.gsub(/\A'|'\Z/, '')
@@ -192,6 +201,70 @@ class Piggybank
         :id => study_id
       }
       JSON.parse(p.body)
+    end
+  end
+
+  class AssessmentDownloadAction < Action
+
+    DEFAULT_OUTPUT_PIECES = {
+      "instrumentId" => "0",
+      "visitId" => "0",
+      "visitLabel" => "All Visits",
+      "studyId" => "0"
+    }
+
+    DEFAULT_OPTIONS = {
+      "collapseseries" => true,
+      "erpscans" => false,
+      "fieldSeparator" => "u0009",
+      "includequestdesc" => "yes",
+      "includeAsmtMeta" => "yes",
+      "lineSeparator" => "u000a",
+      "missingDataVal" => "-1001",
+      "dontKnowVal" => "-1002",
+      "maxrecordsreturn" => 500,
+      "optCollapseByURSI" => false,
+      "optMostCompleteEntries" => false,
+      "orientation" => "crossCollapse",
+      "scanOrientation" => "normalOneCell",
+      "outputPieces" => [{
+      }],
+      "outputScanPieces" => [],
+      "qPieces" => [],
+      "returnall" => true,
+      "scanPieces" => [],
+      "textqualifier" => "\"",
+      "subjectType" => 0,
+      "visitorientation" => "updown",
+      "questFormatSegInt" => true,
+      "questFormatSegInst" => true,
+      "questFormatEC" => false,
+      "questFormatSiteCt" => false,
+      "questFormatSourceCt" => false,
+      "questFormatRaterCt" => false,
+      "questFormatQuesInst" => true,
+      "questFormatDrop1" => true,
+      "allQueriedFields" => false,
+      "limitStSrcRt" => true,
+      "printFirstOnlyAsmt" => false,
+      "includeRespLabel" => false,
+      "showMissingAsPd" => false,
+      "asmtBoolLogic" => false,
+      "scanBoolLogic" => false,
+      "showOnlyDataUrsis" => false,
+      "queryHasRecords" => false,
+      "optCentries" => false
+    }
+
+    def get(options = {})
+      puts "WARNING: This method does not work. Maybe we can figure out why."
+      options = DEFAULT_OPTIONS.merge options
+      p = @agent.get "#{@piggybank.url_base}/micis/downloadcsv.php", {
+        :action => 1,
+        :ds => "scansorassessments",
+        :q => JSON.dump(options)
+      }
+      p.body
     end
   end
 
