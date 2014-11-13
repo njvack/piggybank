@@ -180,7 +180,9 @@ class Piggybank
       "Country" => :country,
       "Email Address" => :email,
       "Notes" => :notes,
-      "Phone1:" => :phone_1 }
+      "Phone 1" => :phone_1,
+      "Phone 2" => :phone_2,
+    }
     def get(subject)
       p = @agent.get "#{@piggybank.url_base}/micis/subject/index.php?action=view&ursi=#{subject.ursi_key}"
       data_hash = Hash[p.search("td.frmLabel").map {|result|

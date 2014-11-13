@@ -20,6 +20,7 @@ class Piggybank
     attr_accessor :country
     attr_accessor :notes
     attr_accessor :phone_1
+    attr_accessor :phone_2
     attr_accessor :email
 
     def ursi_key
