@@ -4,16 +4,15 @@
 
 require 'piggybank'
 
-key = ARGV[0]
+keyfile = ARGV[0]
 
-if !key
+if !keyfile
   puts "Usage: #{__FILE__} <key>"
   exit(1)
 end
 
-pb = Piggybank.new()
-page = pb.login_from_key key
-puts page.body
+pb = Piggybank.logged_in_from_file keyfile
+puts pb.agent.page.body
 
 if pb.logged_in?
   puts "login success!"

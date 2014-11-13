@@ -5,15 +5,14 @@
 require 'piggybank'
 require 'pp'
 
-key = ARGV[0]
+keyfile = ARGV[0]
 
-if !key
+if !keyfile
   puts "Usage: #{__FILE__} <key>"
   exit(1)
 end
 
-pb = Piggybank.new()
-pb.login_from_key key
+pb = Piggybank.logged_in_from_file keyfile
 
 studies = pb.list_studies
 pp studies
