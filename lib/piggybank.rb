@@ -129,22 +129,15 @@ class Piggybank
   class StudyListAction < Action
     def get
       p = @agent.get "#{@piggybank.url_base}/micis/study/index.php?action=list"
-      # Yields something like "[[stuff]]"
-      study_matches = p.body.match(/parent\.list=\[(.*?)\];/)
-      study_matches or return nil
-      study_list = study_matches[1]
-      study_arrays = study_list.scan(/\[(.*?)\]/)
-      study_arrays.map {|ary|
-        study_bits = ary[0].split(",").map {|bit| strip_quotes(bit)}
+      studies_json_rx = /var studiesMeta = ([^;]+)/
+      studies_json = p.body[studies_json_rx, 1]
+      study_data = JSON.parse(studies_json)
+      study_data.map {|sd|
         s = Piggybank::Study.new
-        s.study_number = study_bits[0]
-        s.irb_number = study_bits[1]
-        s.status = study_bits[3]
-        # The name and id are in a string that looks like
-        # WISCDEMO2^javascript:parent.loadPage(\"https://chronus.mrn.org/micis/study/index.php?action=view&study_id=6160\")^pageIframe
-        more_bits = study_bits[2].split('^')
-        s.name = more_bits[0]
-        s.study_id = more_bits[1].match(/study_id=(\d+)/)[1]
+        s.study_number = sd["hrrc_num"]
+        s.name = sd["label"]
+        s.irb_number = sd["irb_number"]
+        s.study_id = sd["study_id"]
         s
       }
     end
