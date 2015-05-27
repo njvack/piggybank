@@ -159,22 +159,22 @@ class Piggybank
   class SubjectViewAction < Action
 
     FIELD_MAP = {
-      "First Name" => :first_name,
-      "Middle Name" => :middle_name,
-      "Last Name" => :last_name,
-      "Suffix" => :suffix,
-      "Birth Date" => :birth_date,
-      "Gender" => :gender,
-      "Address Line 1" => :address_1,
-      "Address Line 2" => :address_2,
-      "City" => :city,
-      "State" => :state,
-      "Zip" => :zip,
-      "Country" => :country,
-      "Email Address" => :email,
-      "Notes" => :notes,
-      "Phone 1" => :phone_1,
-      "Phone 2" => :phone_2,
+      "First Name:" => :first_name,
+      "Middle Name:" => :middle_name,
+      "Last Name:" => :last_name,
+      "Suffix:" => :suffix,
+      "Birth Date:" => :birth_date,
+      "Gender:" => :gender,
+      "Address Line 1:" => :address_1,
+      "Address Line 2:" => :address_2,
+      "City:" => :city,
+      "State:" => :state,
+      "Postal Code:" => :zip,
+      "Country:" => :country,
+      "Email Address:" => :email,
+      "Notes:" => :notes,
+      "Phone 1:" => :phone_1,
+      "Phone 2:" => :phone_2,
     }
     def get(subject)
       p = @agent.get "#{@piggybank.url_base}/micis/subject/index.php?action=view&ursi=#{subject.ursi_key}"
