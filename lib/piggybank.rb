@@ -12,6 +12,7 @@
 require 'mechanize'
 require 'uri'
 require 'json'
+require 'csv'
 
 class Piggybank
   DEFAULT_URL = "https://chronus.mrn.org"
@@ -79,6 +80,11 @@ class Piggybank
   def list_subjects(study_id)
     act = SubjectListAction.new(self)
     act.get(study_id)
+  end
+
+  def list_subjects_from_metaportal(url)
+    act = MetaportalSubjectListAction.new(self)
+    act.get(url)
   end
 
   def get_demographics_by_ursi(ursi)
@@ -153,6 +159,30 @@ class Piggybank
         s.ursi = d[/M\d+/] # URSIs start with M
         s
       }
+    end
+  end
+
+  class MetaportalSubjectListAction < Action
+    def get(url)
+      # Sadly, the CSV doesn't include the anchor date
+      #response = @agent.get(url + "subject/downloadcsv.php?ds=listsubjects").content
+      #CSV.parse(response)
+      p = @agent.post(url + "subject/", { :ursi => "", :site_id => "0", :subjectTypeID => "0", :doQuery => "showList" })
+      data = p.search('table.tableContainer tr').map do |row| 
+        row_output = row.search('td').map do |cell|
+          text = cell.text.strip
+          text.gsub(/[\u00a0\n]/, '') # Some kind of weird non-breaking space COINS throws in
+        end
+        # First column is a details link
+        row_output.shift
+        row_output[4] = Date.parse row_output[4] if row_output[4]
+        row_output[5] = Date.parse row_output[5] if row_output[5]
+        row_output
+      end
+      # First row is a header
+      data.shift
+      # Hash by URSI
+      Hash[data.collect {|v| [v[0], v] }] 
     end
   end
 
