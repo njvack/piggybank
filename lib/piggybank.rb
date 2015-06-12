@@ -12,7 +12,6 @@
 require 'mechanize'
 require 'uri'
 require 'json'
-require 'csv'
 
 class Piggybank
   DEFAULT_URL = "https://chronus.mrn.org"
