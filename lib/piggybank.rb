@@ -393,6 +393,7 @@ class Piggybank
       end.flatten
 
       a.data = Hash[ a.raw_data.map { |e| [ e.column_id, e.response ] } ]
+      a.labels = Hash[ a.raw_data.map { |e| [ e.column_id, e.label ] } ]
 
       a
     end

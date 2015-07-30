@@ -12,6 +12,7 @@ class Piggybank
     attr_accessor :include_in_dx
     attr_accessor :raw_data
     attr_accessor :data
+    attr_accessor :labels
   end
 end
 
