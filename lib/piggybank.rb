@@ -103,14 +103,38 @@ class Piggybank
     act.get(study_id)
   end
 
-  def get_assessments(study_id, instrument_id)
-    act = AssessmentDownloadAction.new(self)
-    pieces = AssessmentDownloadAction::DEFAULT_OUTPUT_PIECES.merge({
-      "instrumentId" => instrument_id.to_s,
-      "studyId" => study_id.to_s
-      })
-    act.get({"outputPieces" => [pieces]})
+  def find_instrument_id_by_name(study_id, name)
+    instruments = list_instruments study_id
+    hash = instruments.find { |i| i["label"] == name }
+    if hash
+      hash["instrument_id"]
+    else
+      nil
+    end
   end
+
+  def get_assessments(study_id, instrument_id, ursi: nil)
+    # Fetch assessments for a given instrument and optional URSI
+    act = AssessmentsDownloadAction.new(self)
+    act.get(study_id, instrument_id, ursi)
+  end
+
+  def get_assessment_details_by_id(study_id, assessment_id)
+    act = AssessmentDetailsDownloadAction.new(self)
+    act.get(study_id, assessment_id)
+  end
+
+  def get_assessment_details(study_id, instrument_id, ursi: nil)
+    # Fetch a given instrument's assessment details for study id and optional URSI 
+    # (keep in mind there may be more than one instance, even for a single URSI)
+    act = AssessmentsDownloadAction.new(self)
+    assessments = act.get(study_id, instrument_id, ursi)
+    assessments.map do |k,v|
+      details = AssessmentDetailsDownloadAction.new(self)
+      details.get(study_id, k)
+    end
+  end
+
 
   module ActionUtils
     def strip_quotes(str)
@@ -127,6 +151,17 @@ class Piggybank
 
     def redirected_to_login?
       @agent.page.body.match "#{@piggybank.url_base}/cas/login.php"
+    end
+
+    def switch_active_study(study_id)
+      # The ASMT interface has a little dropdown at the top
+      # which puts the "actively selected study" into a cookie.
+      # This mirrors that behavior.
+      url = "#{@piggybank.url_base}/micis/asmt/manage/remote.php"
+      @agent.get url, {
+        "type" => "updateActiveStudy",
+        "id" => study_id
+      }
     end
 
   end
@@ -228,69 +263,141 @@ class Piggybank
     end
   end
 
-  class AssessmentDownloadAction < Action
+  class AssessmentsDownloadAction < Action
 
-    DEFAULT_OUTPUT_PIECES = {
-      "instrumentId" => "0",
-      "visitId" => "0",
-      "visitLabel" => "All Visits",
-      "studyId" => "0"
-    }
-
-    DEFAULT_OPTIONS = {
-      "collapseseries" => true,
-      "erpscans" => false,
-      "fieldSeparator" => "u0009",
-      "includequestdesc" => "yes",
-      "includeAsmtMeta" => "yes",
-      "lineSeparator" => "u000a",
-      "missingDataVal" => "-1001",
-      "dontKnowVal" => "-1002",
-      "maxrecordsreturn" => 500,
-      "optCollapseByURSI" => false,
-      "optMostCompleteEntries" => false,
-      "orientation" => "crossCollapse",
-      "scanOrientation" => "normalOneCell",
-      "outputPieces" => [{
-      }],
-      "outputScanPieces" => [],
-      "qPieces" => [],
-      "returnall" => true,
-      "scanPieces" => [],
-      "textqualifier" => "\"",
-      "subjectType" => 0,
-      "visitorientation" => "updown",
-      "questFormatSegInt" => true,
-      "questFormatSegInst" => true,
-      "questFormatEC" => false,
-      "questFormatSiteCt" => false,
-      "questFormatSourceCt" => false,
-      "questFormatRaterCt" => false,
-      "questFormatQuesInst" => true,
-      "questFormatDrop1" => true,
-      "allQueriedFields" => false,
-      "limitStSrcRt" => true,
-      "printFirstOnlyAsmt" => false,
-      "includeRespLabel" => false,
-      "showMissingAsPd" => false,
-      "asmtBoolLogic" => false,
-      "scanBoolLogic" => false,
-      "showOnlyDataUrsis" => false,
-      "queryHasRecords" => false,
-      "optCentries" => false
-    }
-
-    def get(options = {})
-      puts "WARNING: This method does not work. Maybe we can figure out why."
-      options = DEFAULT_OPTIONS.merge options
-      p = @agent.get "#{@piggybank.url_base}/micis/downloadcsv.php", {
-        :action => 1,
-        :ds => "scansorassessments",
-        :q => JSON.dump(options)
+    def get(study_id, instrument_id, ursi)
+      # First we have to do whatever onAsmtStudyChange(asmt_study_id) is doing
+      switch_active_study study_id
+      
+      # Now we can just fetch the search by instrument_id
+      options = {
+        "action" => "search",
+        "instrument_id" => instrument_id,
+        "dataentry_type_id" => "1",
+        "ownersOnly" => "off",
+        "DoSearch" => "true",
       }
-      p.body
+
+      if ursi
+        options["ursi"] = ursi
+      end
+
+      url = "#{@piggybank.url_base}/micis/asmt/manage/index.php"
+      
+      #@agent.log = Logger.new(STDERR)
+      p = @agent.get url, options
+
+      data = p.search('table#asmt_grid tr').map do |row| 
+        r = row.search('td').map do |cell|
+          text = cell.text.strip
+          text.gsub(/[\u00a0\n]/, '') # Some kind of weird non-breaking space COINS throws in
+        end
+
+        a = Piggybank::Assessment.new
+        a.assessment_id = r[0]
+        a.study_id = study_id
+        a.ursi = r[1]
+        a.instrument_name = r[2]
+        a.rater1 = r[3]
+        a.date = Date.parse r[4] if r[4]
+        a.site = r[5]
+        a.visit = r[6]
+        a.visit_instance = r[7]
+        a.entry_code = r[8]
+        a.entry_start = r[9]
+        a.entry_end = r[10]
+        a.user = r[11]
+
+        a
+      end
+
+      # First row is a header
+      data.shift
+      # Hash by assessment_id
+      Hash[data.delete_if {|v| v.assessment_id == nil}.collect {|v| [v.assessment_id, v] }] 
     end
   end
+
+  class AssessmentDetailsDownloadAction < Action
+
+    def get(study_id, assessment_id)
+      # Example URL: https://coinstraining.mrn.org/micis/asmt/assessments/index.php?action=responses&id=13876005
+      
+      # First we have to do whatever onAsmtStudyChange(asmt_study_id) is doing
+      switch_active_study study_id
+      
+      # Now we can just fetch the assessment by id
+      options = {
+        "action" => "responses",
+        "id" => assessment_id,
+      }
+
+      url = "#{@piggybank.url_base}/micis/asmt/assessments/index.php"
+      
+      #@agent.log = Logger.new(STDERR)
+      p = @agent.get url, options
+
+      a = Piggybank::AssessmentDetails.new
+      a.assessment_id = assessment_id
+      a.study_id = study_id
+
+      tables = p.search('table')
+      metadata = tables.shift
+
+      # We scrape the metadata at the top of the page
+      metadata.search('tr').map do |row| 
+        tds = row.search('td')
+        label = tds.shift.text.strip
+        content = tds.shift.text.strip
+
+        case label
+        when /ursi/i
+          a.ursi = content
+        when /rater/i
+          a.rater = content
+        when /date/i
+          # For some reason, `Date.parse` explodes here
+          a.date = content
+        when /entry/i
+          a.entry_code = content
+        when /segment/i
+          a.segment = content
+        when /rater_completed/i
+          a.rater_completed = content
+        when /notes/i
+          a.notes = content
+        when /dx/i
+          a.include_in_dx = content
+        end
+      end
+
+      # Then the tables of "section" data at the bottom,
+      # which we aggregate in a big pile for now because 
+      # Dan don't understand 'em
+      # TODO: Understand what happens with multiple attempts at a single assessment?
+      a.raw_data = tables.map do |t|
+        rows = t.search('tr')
+        rows.shift
+        rows.map do |r|
+          entry_data = r.search('td').map do |cell|
+            cell.text.strip
+          end
+          entry = Piggybank::AssessmentEntry.new a
+          entry.column_id = entry_data[0]
+          entry.label = entry_data[1]
+          entry.instance = entry_data[2]
+          entry.response = entry_data[3]
+          entry.notes = entry_data[4]
+          entry
+        end
+      end.flatten
+
+      a.data = Hash[ a.raw_data.map { |e| [ e.column_id, e.response ] } ]
+
+      a
+    end
+  end
+
 
   class Error < RuntimeError
 
@@ -302,3 +409,6 @@ end
 
 require 'piggybank/study'
 require 'piggybank/subject'
+require 'piggybank/assessment'
+require 'piggybank/assessment_details'
+require 'piggybank/assessment_entry'
