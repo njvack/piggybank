@@ -205,7 +205,9 @@ class Piggybank
       data = p.search('table.tableContainer tr').map do |row| 
         row_output = row.search('td').map do |cell|
           text = cell.text.strip
-          text.gsub(/[\u00a0\n]/, '') # Some kind of weird non-breaking space COINS throws in
+          text.gsub!(/[\u00a0\n]/, '') # Some kind of weird non-breaking space COINS throws in
+          text.gsub!(/[\u00c2\n]/, '') # Some weird upper-ascii thing COINS throws in as a separator? Or maybe a Unicode translation issue?
+          text
         end
         # First column is a details link
         row_output.shift
