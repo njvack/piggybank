@@ -135,6 +135,11 @@ class Piggybank
     end
   end
 
+  def get_query_builder_results_for_study_and_ursi(study_id, ursi)
+    act = QueryBuilderAction.new(self)
+    act.get(study_id, ursi)
+  end
+
 
   module ActionUtils
     def strip_quotes(str)
@@ -398,6 +403,125 @@ class Piggybank
       a.labels = Hash[ a.raw_data.map { |e| [ e.column_id, e.label ] } ]
 
       a
+    end
+  end
+
+  class QueryBuilderAction < Action
+    def get(study_id, ursi)
+      opts = {
+        :collapseseries => false,
+        :demoPieces => [],
+        :erpscans => false,
+        :fieldSeparator => "u0009",
+        :includequestdesc => "yes",
+        :includeSALabel => "no",
+        :asmtDate => "asmtDate",
+        :includeAsmtMeta => "yes",
+        :lineSeparator => "u000a",
+        :missingDataVal => "-1001",
+        :dontKnowVal => "-1002",
+        :maxrecordsreturn => 500,
+        :optCollapseByURSI => false,
+        :optMostCompleteEntries => false,
+        :orientation => "crossCollapse",
+        :scanOrientation => "normalOneCell",
+        #:outputPieces => [
+        #  {"instrumentId"=>"24043","instrumentLabel"=>"Demo T2","visitId"=>"0","visitLabel"=>"All Visits","fieldId"=>"DEMOGRAPH2_001a","fieldLabel"=>"[DEMOGRAPH2_001a] What is your current age?","studyId"=>"6840"},
+        #  {"instrumentId"=>"24043","instrumentLabel"=>"Demo T2","visitId"=>"0","visitLabel"=>"All Visits","fieldId"=>"DEMOGRAPH2_001","fieldLabel"=>"[DEMOGRAPH2_001] Are you the biological parent?","studyId"=>"6840"}
+        #],
+        :outputPieces => [ {
+          :instrumentId => "0",
+          :instrumentLabel => "All Instruments",
+          :visitId => "0",
+          :visitLabel => "All Visits",
+          :fieldId => 0,
+          :fieldLabel => "All Fields",
+          :studyId => "6840"
+        } ],
+        :outputScanPieces => [],
+        :qPieces => [],
+        :returnall => false,
+        :scanPieces => [],
+        :textqualifier => "\"",
+        :ursiList => "",
+        :ursisInStudy => 0,
+        :subjectType => 0,
+        :validSpecifiedUrsis => ursi,
+        :visitorientation => "updown",
+        :questFormatSegInt => true,
+        :questFormatSegInst => true,
+        :questFormatEC => false,
+        :questFormatSiteCt => false,
+        :questFormatSourceCt => false,
+        :questFormatRaterCt => false,
+        :questFormatQuesInst => true,
+        :questFormatDrop1 => true,
+        :allQueriedFields => false,
+        :limitStSrcRt => true,
+        :printFirstOnlyAsmt => false,
+        :includeRespLabel => false,
+        :includeAllMultiOptions => false,
+        :showMissingAsPd => false,
+        :preventDateConversion => false,
+        :outputNumericAsString => false,
+        :asmtBoolLogic => false,
+        :scanBoolLogic => false,
+        :showOnlyDataUrsis => false,
+        :queryHasRecords => false,
+        :subjectListType => "ursi",
+        :subjectTags => nil,
+        :subjectListTagID => nil,
+        :subjectListTagContext => ["global"],
+        :subjectListTagStudyID => nil,
+        :asmtDateOptions => {
+          :selected => false,
+          :asmtMinDate => nil,
+          :asmtMaxDate => nil,
+          :asmtMinEntryStartDate => nil,
+          :asmtMaxEntryStartDate => nil,
+          :asmtMinEntryEndDate => nil,
+          :asmtMaxEntryEndDate => nil
+        },
+        :exportSubjectTags => [],
+        # Only included some of the time?
+        #:optCentries => false,
+        # Only included some of the time?
+        # :subjectTypeStudy => 0,
+      }
+
+      # Those opts get passed as JSON to the handler.
+      json = JSON.generate opts
+
+
+      url = "#{@piggybank.url_base}/micis/qbBeta/remote.php"
+
+      puts "Fetching using json: #{json}"
+
+      @agent.idle_timeout = 30
+      @agent.read_timeout = 600
+
+      p = @agent.post(@piggybank.url_base + "/micis/remote/getStudyData.php", { :type => "getresults", :q => json })
+      puts "Got result count: #{p.body}"
+
+      p = @agent.post(url, { :action => "cacheSortOrder", :q => json })
+      puts "Got cacheSortOrder response: #{p.body}"
+
+      # Yes, QBR passes action as both querystring and in POST here. Not sure 
+      # why but let's do the same!
+      p = @agent.post(url + "?action=cachePivotCategories", { :action => "cachePivotCategories", :q => json })
+      puts "Got cachePivotCategories response: #{p.body}"
+
+      p = @agent.post(url, { :action => "writeExportFile", :q => json })
+      result_json = JSON.parse p.body
+      
+      if result_json.key? "error" then
+        raise "Got writeExportFile error, try running from the UI with these parameters: #{result_json.error}"
+      elsif result_json.key? "body" then
+        url = @piggybank.url_base + "/micis/qbBeta/remote.php?action=downloadFile&filename=" + result_json["body"]["filename"]
+        file = "coins_rulez.zip"
+        @agent.download(url, file)
+        return file
+      end
     end
   end
 
