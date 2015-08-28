@@ -135,6 +135,23 @@ class Piggybank
     end
   end
 
+  def get_query_builder_results(study_id, instrument_names, ursis: nil, returnType: :mostComplete)
+    # Fetch query builder result CSV(s)
+    # returnType can be:
+    #   - :mostComplete => "Most complete (Cs, 1s and 2s, 1s if no Cs or 2s, and 1s and 2s if Fs)"
+    #   - :onlyDoubleEntryComplete => "Only Double Entry Complete Records (Cs)"
+    #   - :all => "Every Assessment Record"
+    #   - nil or something else => UNKNOWN CHAOS EVENT OCCURS
+
+    if ursis.nil?
+      # First get all ursis in study
+      subjects = list_subjects(study_id)
+      ursis = subjects.map {|s| s.ursi}
+    end
+    act = QueryBuilderAction.new(self)
+    act.get(study_id, instrument_names, ursis, optReturnType: returnType)
+  end
+
 
   module ActionUtils
     def strip_quotes(str)
@@ -185,7 +202,7 @@ class Piggybank
 
   class SubjectListAction < Action
     def get(study_id)
-      p = @agent.get "#{@piggybank.url_base}/micis/subject/index.php?action=getStudy&study_id=#{study_id}&DoGetStudySubjects=true"
+      p = @agent.get "#{@piggybank.url_base}/micis/subject/index.php?action=listSubjects&study_id=#{study_id}&DoGetStudySubjects=true"
       subject_data_ary = p.body.scan(/\[('M[^\]]+)\]/)
       subject_data_ary.map {|sda|
         d = sda[0]
@@ -201,7 +218,7 @@ class Piggybank
       # Sadly, the CSV doesn't include the anchor date
       #response = @agent.get(url + "subject/downloadcsv.php?ds=listsubjects").content
       #CSV.parse(response)
-      p = @agent.post(url + "subject/", { :ursi => "", :site_id => "0", :subjectTypeID => "0", :doQuery => "showList" })
+      p = @agent.post(url + "subject/", { :ursi => "", :site_id => "0", :subjectTypeID => "0", :doQuery => "Show List" })
       data = p.search('table.tableContainer tr').map do |row| 
         row_output = row.search('td').map do |cell|
           text = cell.text.strip
@@ -398,6 +415,175 @@ class Piggybank
       a.labels = Hash[ a.raw_data.map { |e| [ e.column_id, e.label ] } ]
 
       a
+    end
+  end
+
+  class QueryBuilderAction < Action
+    def get(study_id, instrument_names, ursis, optReturnType: :mostComplete)
+      opts = {
+        :collapseseries => false,
+        :demoPieces => [],
+        :erpscans => false,
+        :fieldSeparator => "u0009",
+        :includequestdesc => "yes",
+        :includeSALabel => "no",
+        :asmtDate => "asmtDate",
+        :includeAsmtMeta => "yes",
+        :lineSeparator => "u000a",
+        :missingDataVal => "-1001",
+        :dontKnowVal => "-1002",
+        :maxrecordsreturn => 500,
+        :optCollapseByURSI => false,
+        :orientation => "crossCollapse",
+        :scanOrientation => "normalOneCell",
+        :outputScanPieces => [],
+        :qPieces => [],
+        :scanPieces => [],
+        :textqualifier => "\"",
+        :ursiList => "",
+        :ursisInStudy => 0,
+        :subjectType => 0,
+        :validSpecifiedUrsis => ursis.join(","),
+        :visitorientation => "updown",
+        :questFormatSegInt => true,
+        :questFormatSegInst => true,
+        :questFormatEC => false,
+        :questFormatSiteCt => false,
+        :questFormatSourceCt => false,
+        :questFormatRaterCt => false,
+        :questFormatQuesInst => true,
+        :questFormatDrop1 => true,
+        :allQueriedFields => false,
+        :limitStSrcRt => true,
+        :printFirstOnlyAsmt => false,
+        :includeRespLabel => false,
+        :includeAllMultiOptions => false,
+        :showMissingAsPd => false,
+        :preventDateConversion => false,
+        :outputNumericAsString => false,
+        :asmtBoolLogic => false,
+        :scanBoolLogic => false,
+        :showOnlyDataUrsis => false,
+        :queryHasRecords => false,
+        :subjectListType => "ursi",
+        :subjectTags => nil,
+        :subjectListTagID => nil,
+        :subjectListTagContext => ["global"],
+        :subjectListTagStudyID => nil,
+        :asmtDateOptions => {
+          :selected => false,
+          :asmtMinDate => nil,
+          :asmtMaxDate => nil,
+          :asmtMinEntryStartDate => nil,
+          :asmtMaxEntryStartDate => nil,
+          :asmtMinEntryEndDate => nil,
+          :asmtMaxEntryEndDate => nil
+        },
+        :exportSubjectTags => [],
+        # Only included some of the time?
+        # :subjectTypeStudy => 0,
+      }
+
+      case optReturnType
+      when :onlyDoubleEntryComplete
+        opts[:optCentries] = "true"
+      when :all
+        opts[:returnall] = "true"
+      when :mostComplete
+        opts[:optMostCompleteEntries] = "true"
+      end
+
+      sd_url = "#{@piggybank.url_base}/micis/remote/getStudyData.php"
+      qb_url = "#{@piggybank.url_base}/micis/qbBeta/remote.php"
+
+      # First, we need to determine the instruments for this study
+      p = @agent.post(sd_url, { :type => "instruments", :id => study_id })
+      instruments_json = JSON.parse p.body
+
+      outputs = []
+      instrument_names.each do |name|
+        instrument = instruments_json.find {|i| i["label"] == name}
+        if instrument.nil? or not instrument.key?("instrument_id")
+          puts "Warning: Instrument not found with name #{name}"
+        else
+          instrument_id = instrument["instrument_id"]
+          q = @agent.post(sd_url, { :type => "questions", :id => instrument_id })
+          questions_json = JSON.parse q.body
+
+          questions_json.each do |question|
+            outputs << {
+              "instrumentId" => instrument_id,
+              "instrumentLabel" => name,
+              "visitId" => 0,
+              "visitLabel" => "All Visits",
+              "fieldId" => question["question_id"],
+              "fieldLabel" => question["label"],
+              "studyId" => study_id,
+            }
+          end
+        end
+      end
+      
+
+      # Those opts get passed as JSON to the handler, after we cram in
+      # all the output pieces for the instruments we want to fetch.
+      opts[:outputPieces] = outputs
+      json = JSON.generate opts
+
+      @agent.idle_timeout = 30
+      @agent.read_timeout = 600
+
+      # Little helper to dump useful stuff when problems happen
+      def json_or_error(json, page)
+        begin
+          result = JSON.parse page.body
+        rescue Exception=>e
+          raise "Got parse error #{e} in #{page.to_s}, json submitted was #{json}"
+        end
+        if result.key? "error" then
+          raise "Got error in #{page.to_s}, #{result.error}, json submitted was #{json}"
+        end
+        return result
+      end
+
+      @agent.post(sd_url, { :type => "getresults", :q => json })
+
+      json_or_error(json, @agent.post(qb_url, { :action => "cacheSortOrder", :q => json }))
+
+      # Yes, QBR passes action as both querystring and in POST here.
+      # Not sure why but let's do the same!
+      json_or_error(json, @agent.post(qb_url + "?action=cachePivotCategories", { :action => "cachePivotCategories", :q => json }))
+
+      result_json = json_or_error(json, @agent.post(qb_url, { :action => "writeExportFile", :q => json }))
+      
+      unless result_json.key? "body" then
+        raise "No body in #{result_json.to_s}"
+      end
+        
+      url = qb_url + "?action=downloadFile&filename=" + result_json["body"]["filename"]
+      Dir.mktmpdir do |tmpdir|
+        file = File.join(tmpdir, "coins.zip")
+
+        @agent.download(url, file)
+        original_dir = Dir.pwd
+        Dir.chdir tmpdir
+        system("unzip", "-qq", file)
+
+        subdirs = Dir.glob('*').select {|f| File.directory? f and f =~ /^coins/}
+
+        if subdirs.length != 1
+          raise "Expected 1 directory, got #{subdirs}"
+        end
+
+        Dir.chdir original_dir
+
+        files = Dir.glob(File.join(tmpdir, subdirs[0], "*"))
+        files.map do |f|
+          name = File.basename f
+          FileUtils.mv(f, File.join(original_dir, name))
+          name
+        end
+      end
     end
   end
 
