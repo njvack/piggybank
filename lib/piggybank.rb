@@ -202,7 +202,7 @@ class Piggybank
 
   class SubjectListAction < Action
     def get(study_id)
-      p = @agent.get "#{@piggybank.url_base}/micis/subject/index.php?action=getStudy&study_id=#{study_id}&DoGetStudySubjects=true"
+      p = @agent.get "#{@piggybank.url_base}/micis/subject/index.php?action=listSubjects&study_id=#{study_id}&DoGetStudySubjects=true"
       subject_data_ary = p.body.scan(/\[('M[^\]]+)\]/)
       subject_data_ary.map {|sda|
         d = sda[0]
@@ -218,7 +218,7 @@ class Piggybank
       # Sadly, the CSV doesn't include the anchor date
       #response = @agent.get(url + "subject/downloadcsv.php?ds=listsubjects").content
       #CSV.parse(response)
-      p = @agent.post(url + "subject/", { :ursi => "", :site_id => "0", :subjectTypeID => "0", :doQuery => "showList" })
+      p = @agent.post(url + "subject/", { :ursi => "", :site_id => "0", :subjectTypeID => "0", :doQuery => "Show List" })
       data = p.search('table.tableContainer tr').map do |row| 
         row_output = row.search('td').map do |cell|
           text = cell.text.strip
