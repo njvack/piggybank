@@ -10,7 +10,7 @@ This library is horribly brittle and you should probably not use it unless you l
 
 Install [RDoc](https://github.com/rdoc/rdoc) and run `rdoc` in the base directory of your piggybank checkout.
 
-Look at the glorious examples in [the examples directory](tree/master/examples).
+Look at the glorious examples in [the examples directory](/examples).
 
 
 ### Things you can do
