@@ -3,6 +3,7 @@
 # Released under the MIT license; see LICENSE
 
 require 'mechanize'
+require 'nokogiri'
 require 'uri'
 require 'json'
 
@@ -134,6 +135,13 @@ class Piggybank
     s = get_demographics(s)
     s
   end
+  
+  def get_tags_by_ursi(ursi)
+    s = Subject.new
+    s.ursi = ursi
+    s = get_tags(s)
+    s
+  end
 
   ##
   # Given a Subject object, get demographics data using SubjectViewAction.
@@ -142,6 +150,15 @@ class Piggybank
   def get_demographics(subject)
     act = SubjectViewAction.new(self)
     act.get(subject)
+  end
+  
+  ##
+  # Given a Subject object, get tags data using SubjectViewAction.
+  #
+  # Wrapped by get_demographics_by_ursi
+  def get_tags(subject)
+    act = SubjectViewAction.new(self)
+    act.get_tags(subject)
   end
 
   ##
@@ -369,8 +386,48 @@ class Piggybank
       end
       out
     end
+  
+    def get_tags(subject)
+	# COINS displays subject tags in two ways: If there's only one tag, it'll be displayed
+	# via 2 'editor' tables, ready for the user to edit. The tag name is shown in a SELECT
+	# (pull-down menu) with the tag name as the OPTION that is SELECTED. And the tag value
+	# is in a corresponding editable text INPUT in a second table.
+	# If there are more than 1 tag, they'll all be displayed in a single table, with the tag
+	# names in the first column and the tag values in the last column.
+
+	  tags = Hash.new
+      p = @agent.get "#{@piggybank.url_base}/micis/subject/index.php?action=extideditor&ursi=#{subject.ursi_key}"
+	  htmlNodes = Nokogiri::HTML(p.body)
+	  multiTagTable = htmlNodes.xpath("//table[@id='subject_tags_table']")
+	  if !multiTagTable.nil? and multiTagTable.size > 0
+	   tagRows = multiTagTable.search("tr")
+	   tagRows.each do |row|
+		tagRowCells = row.search("td")
+		tagName = tagRowCells[0].content.to_s
+		tagValue = tagRowCells[2].content.to_s
+		if tagName != "Type"	# Skip the header row of the table
+		  tags[tagName] = tagValue
+		end
+	   end  # do
+	  else
+		  singleTagTables = htmlNodes.search("table")
+		  selectorText = singleTagTables.xpath("//tr/td/select[@name='subject_tag_id']").to_s
+		  # We're looking for the OPTION from the SELECT menu that is SELECTED. We want the
+		  # displayed text from that. Which is between "<option ... selected>" and "<whatever ...>".
+		  # So the regex should lazily (not greedily) pull all the text (aka "(.*?)" ) between them.
+		  tagName = selectorText[/selected>(.*?)</, 1]
+		  inputText = singleTagTables.xpath("//tr/td/input[@name='value']").to_s
+		  # There's probably a way to pull this out using xpath(), but this regex works and is easy.
+		  tagValue = inputText[/value=\"(.*?)\"/, 1]
+		  if !tagName.nil? and !tagValue.nil?
+			tags[tagName] = tagValue
+		  end
+	  end
+	  return tags
+    end
   end
 
+  
   ##
   # Pull instruments from the study instrument page, parsing
   # the JSON directly as a simple Hash
