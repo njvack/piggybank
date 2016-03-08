@@ -310,7 +310,10 @@ class Piggybank
   class SubjectListAction < Action
     def get(study_id)
       p = @agent.get "#{@piggybank.url_base}/micis/subject/index.php?action=listSubjects&study_id=#{study_id}&DoGetStudySubjects=true"
-      subject_data_ary = p.body.scan(/\[('M[^\]]+)\]/)
+      # subject_data_ary = p.body.scan(/\[('M[^\]]+)\]/)
+	  # Looks like it was formatted before as [M{digits}], for example [M12345678], but that's gone so now just look
+	  # for a capital M followed by exactly 8 numbers, aka an URSI.
+	  subject_data_ary = p.body.scan(/(M\d{8})/)
       subject_data_ary.map {|sda|
         d = sda[0]
         s = Piggybank::Subject.new
