@@ -143,6 +143,22 @@ class Piggybank
     s
   end
 
+  # Get the Subject Enrollment info for an URSI
+  def get_enrollment_by_ursi(ursi)
+    s = Subject.new
+    s.ursi = ursi
+    s = get_enrollment(s)
+    s
+  end
+
+  # Get the Study Level Details for an URSI
+  def get_details_by_ursi(ursi)
+    s = Subject.new
+    s.ursi = ursi
+    s = get_details(s)
+    s
+  end
+
   ##
   # Given a Subject object, get demographics data using SubjectViewAction.
   #
@@ -159,6 +175,18 @@ class Piggybank
   def get_tags(subject)
     act = SubjectViewAction.new(self)
     act.get_tags(subject)
+  end
+
+  # Given a Subject object, get enrollment data using SubjectViewAction.
+  def get_enrollment(subject)
+    act = SubjectViewAction.new(self)
+    act.get_enrollment(subject)
+  end
+
+  # Given a Subject object, get details data using SubjectViewAction.
+  def get_details(subject)
+    act = SubjectViewAction.new(self)
+    act.get_details(subject)
   end
 
   ##
@@ -365,6 +393,11 @@ class Piggybank
       "Middle Name:" => :middle_name,
       "Last Name:" => :last_name,
       "Suffix:" => :suffix,
+      "First Name at Birth:" => :first_name_at_birth,
+      "Middle Name at Birth:" => :middle_name_at_birth,
+      "Last Name at Birth:" => :last_name_at_birth,
+      "Physical Sex at Birth:" => :physical_sex_at_birth,
+      "City Born In:" => :city_born_in,
       "Birth Date:" => :birth_date,
       "Gender:" => :gender,
       "Address Line 1:" => :address_1,
@@ -389,6 +422,76 @@ class Piggybank
       end
       out
     end
+  
+    def getStuff(s)
+	if (s.nil?)
+          return ""
+	end
+	c = s.content
+	if (c.nil?)
+          return ""
+	end
+	if (c.size < 1)
+	  return ""
+	end
+	return c.to_s
+    end
+
+    def get_enrollment(subject)
+	  enrollment = Hash.new
+      p = @agent.get "#{@piggybank.url_base}/micis/subject/index.php?action=enrollmenteditor&ursi=#{subject.ursi_key}"
+	  htmlNodes = Nokogiri::HTML(p.body)
+	  enrollmentTable = htmlNodes.xpath("//table")
+	  if !enrollmentTable.nil? and enrollmentTable.size > 0
+	   enrollmentRows = enrollmentTable.search("tr[@class='grid']")
+	   enrollmentURSI = "NOURSI"
+	   enrollmentSubjectType = ""
+	   enrollmentDate = ""
+	   enrollmentRows.each do |row|
+		enrollmentRowCells = row.search("td")
+		cellName = getStuff(enrollmentRowCells[0])
+		cellValue = getStuff(enrollmentRowCells[1])
+		if cellName == "URSI:"
+			enrollmentURSI = cellValue
+		end
+		if cellName == "Currently Enrolled As:"
+			enrollmentSubjectType = cellValue
+		end
+		if cellName == "Date Enrolled:"
+			enrollmentInput = enrollmentRowCells[1].search("input")
+			enrollmentDate = enrollmentInput.attribute("value")
+		end
+	   end  # do
+	   if enrollmentURSI != "NOURSI"# Skip if didn't find URSI
+	       enrollment[enrollmentURSI] = "Subject Type: " + enrollmentSubjectType + ", Enrolled: " + enrollmentDate
+	   end
+	  return enrollment
+    end
+  end
+
+
+    def get_details(subject)
+	  details = Hash.new
+      p = @agent.get "#{@piggybank.url_base}/micis/subject/index.php?action=studyleveldetails&ursi=#{subject.ursi_key}"
+	  htmlNodes = Nokogiri::HTML(p.body)
+	  detailsTable = htmlNodes.xpath("//table")
+	  if !detailsTable.nil? and detailsTable.size > 0
+	   detailsRows = detailsTable.search("tr")
+	   detailsRows.each do |row|
+		detailsRowCells = row.search("td")
+		detailsStudy = getStuff(detailsRowCells[0])
+		detailsURSI = getStuff(detailsRowCells[1])
+		detailsEthnicity = getStuff(detailsRowCells[2])
+		detailsRacialCategories = getStuff(detailsRowCells[3])
+		detailsPHILinked = getStuff(detailsRowCells[4])
+		if detailsStudy != "Study"# Skip the header row of the table
+		  details[detailsURSI] = "Study " + detailsStudy + ", Ethnicity: " + detailsEthnicity + ", Racial categories: " + detailsRacialCategories + ", PHI linked: " + detailsPHILinked
+		end
+	   end  # do
+	  return details
+    end
+  end
+
   
     def get_tags(subject)
 	# COINS displays subject tags in two ways: If there's only one tag, it'll be displayed
@@ -785,8 +888,8 @@ class Piggybank
 end
 
 
-require 'piggybank/study'
-require 'piggybank/subject'
-require 'piggybank/assessment'
-require 'piggybank/assessment_details'
-require 'piggybank/assessment_entry'
+require_relative './piggybank/study'
+require_relative './piggybank/subject'
+require_relative './piggybank/assessment'
+require_relative './piggybank/assessment_details'
+require_relative './piggybank/assessment_entry'
