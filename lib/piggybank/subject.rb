@@ -18,6 +18,11 @@ class Piggybank
     attr_accessor :middle_name
     attr_accessor :last_name
     attr_accessor :suffix
+    attr_accessor :first_name_at_birth
+    attr_accessor :middle_name_at_birth
+    attr_accessor :last_name_at_birth
+    attr_accessor :physical_sex_at_birth
+    attr_accessor :city_born_in
     attr_accessor :gender
     attr_accessor :birth_date
     attr_accessor :address_1
