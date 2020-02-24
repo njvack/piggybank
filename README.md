@@ -5,6 +5,10 @@ A ruby library to integrate with MRN's COINS database.
 
 This library is horribly brittle and you should probably not use it unless you like gluing together broken pieces of things when they break.
 
+Also, it is no longer maintained by its creators in any way, so you should not use it unless you want to support it yourself.
+
+Really, probably don't use it. It's mainly here for posterity's sake.
+
 
 ### Documentation
 
