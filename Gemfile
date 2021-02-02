@@ -2,4 +2,4 @@ source 'https://rubygems.org'
 
 gemspec
 
-gem 'mechanize', '~> 2.7.3'
+gem 'mechanize', '~> 2.7.7'
